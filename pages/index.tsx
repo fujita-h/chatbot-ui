@@ -35,6 +35,10 @@ import Head from 'next/head';
 import { useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import toast from 'react-hot-toast';
+import { InteractionStatus } from '@azure/msal-browser';
+import { AuthenticatedTemplate, UnauthenticatedTemplate, useMsal } from "@azure/msal-react"
+import { LoginPage } from '@/components/Auth/LoginPage';
+import { apiScopes } from '@/auth.config';
 
 interface HomeProps {
   serverSideApiKeyIsSet: boolean;
@@ -46,6 +50,19 @@ const Home: React.FC<HomeProps> = ({
   defaultModelId,
 }) => {
   const { t } = useTranslation('chat');
+
+  // MSAL ----------------------------------------------
+
+  const { instance, accounts, inProgress } = useMsal()
+
+  const getAccessToken = async () => {
+    const msalAuthResult = await instance.acquireTokenSilent({
+      account: accounts[0],
+      scopes: apiScopes,
+    })
+    const accessToken = msalAuthResult.accessToken || "";
+    return accessToken;
+  }
 
   // STATE ----------------------------------------------
 
@@ -113,6 +130,7 @@ const Home: React.FC<HomeProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await getAccessToken() || ''}`,
         },
         signal: controller.signal,
         body: JSON.stringify(chatBody),
@@ -242,6 +260,7 @@ const Home: React.FC<HomeProps> = ({
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getAccessToken() || ''}`,
       },
       body: JSON.stringify({
         key,
@@ -532,6 +551,14 @@ const Home: React.FC<HomeProps> = ({
     savePrompts(updatedPrompts);
   };
 
+  // LOGOUT --------------------------------------------
+  
+  const handleLogout = () => {
+    instance.logoutRedirect({
+      account: accounts[0]
+    });
+  };
+
   // EFFECTS  --------------------------------------------
 
   useEffect(() => {
@@ -623,6 +650,8 @@ const Home: React.FC<HomeProps> = ({
     }
   }, [serverSideApiKeyIsSet]);
 
+  if (inProgress !== InteractionStatus.None) { return (<></>) }
+
   return (
     <>
       <Head>
@@ -664,6 +693,7 @@ const Home: React.FC<HomeProps> = ({
                   onDeleteConversation={handleDeleteConversation}
                   onUpdateConversation={handleUpdateConversation}
                   onApiKeyChange={handleApiKeyChange}
+                  onLogout={handleLogout}
                   onClearConversations={handleClearConversations}
                   onExportConversations={handleExportData}
                   onImportConversations={handleImportConversations}
@@ -744,7 +774,23 @@ const Home: React.FC<HomeProps> = ({
     </>
   );
 };
-export default Home;
+
+const MsalWrapper: React.FC<HomeProps> = (props) => {
+  const { instance, accounts, inProgress } = useMsal()
+  if (inProgress !== InteractionStatus.None) { return (<></>) }
+
+  return (
+    <>
+      <AuthenticatedTemplate>
+        <Home {...props} />
+      </AuthenticatedTemplate>
+      <UnauthenticatedTemplate>
+        <LoginPage />
+      </UnauthenticatedTemplate>
+    </>
+  );
+};
+export default MsalWrapper;
 
 export const getServerSideProps: GetServerSideProps = async ({ locale }) => {
   const defaultModelId =

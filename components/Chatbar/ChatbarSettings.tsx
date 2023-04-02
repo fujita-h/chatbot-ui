@@ -6,6 +6,7 @@ import { Import } from '../Settings/Import';
 import { Key } from '../Settings/Key';
 import { SidebarButton } from '../Sidebar/SidebarButton';
 import { ClearConversations } from './ClearConversations';
+import { Logout } from './Logout';
 
 interface Props {
   lightMode: 'light' | 'dark';
@@ -13,6 +14,7 @@ interface Props {
   conversationsCount: number;
   onToggleLightMode: (mode: 'light' | 'dark') => void;
   onApiKeyChange: (apiKey: string) => void;
+  onLogout: () => void;
   onClearConversations: () => void;
   onExportConversations: () => void;
   onImportConversations: (data: SupportedExportFormats) => void;
@@ -24,6 +26,7 @@ export const ChatbarSettings: FC<Props> = ({
   conversationsCount,
   onToggleLightMode,
   onApiKeyChange,
+  onLogout,
   onClearConversations,
   onExportConversations,
   onImportConversations,
@@ -54,6 +57,9 @@ export const ChatbarSettings: FC<Props> = ({
       />
 
       <Key apiKey={apiKey} onApiKeyChange={onApiKeyChange} />
+
+      <Logout onLogout={onLogout} />
+
     </div>
   );
 };

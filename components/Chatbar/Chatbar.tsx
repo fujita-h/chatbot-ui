@@ -33,6 +33,7 @@ interface Props {
     data: KeyValuePair,
   ) => void;
   onApiKeyChange: (apiKey: string) => void;
+  onLogout: () => void;
   onClearConversations: () => void;
   onExportConversations: () => void;
   onImportConversations: (data: SupportedExportFormats) => void;
@@ -54,6 +55,7 @@ export const Chatbar: FC<Props> = ({
   onDeleteConversation,
   onUpdateConversation,
   onApiKeyChange,
+  onLogout,
   onClearConversations,
   onExportConversations,
   onImportConversations,
@@ -198,6 +200,7 @@ export const Chatbar: FC<Props> = ({
         conversationsCount={conversations.length}
         onToggleLightMode={onToggleLightMode}
         onApiKeyChange={onApiKeyChange}
+        onLogout={onLogout}
         onClearConversations={onClearConversations}
         onExportConversations={onExportConversations}
         onImportConversations={onImportConversations}
