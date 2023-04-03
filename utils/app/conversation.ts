@@ -12,8 +12,8 @@ export const updateConversation = (
     return c;
   });
 
-  saveConversation(updatedConversation);
-  saveConversations(updatedConversations);
+  //saveConversation(updatedConversation);
+  //saveConversations(updatedConversations);
 
   return {
     single: updatedConversation,

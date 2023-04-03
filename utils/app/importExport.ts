@@ -68,10 +68,10 @@ function currentDate() {
   return `${month}-${day}`;
 }
 
-export const exportData = () => {
-  let history = localStorage.getItem('conversationHistory');
-  let folders = localStorage.getItem('folders');
-  let prompts = localStorage.getItem('prompts');
+export const exportData = (history: string, folders: string, prompts: string) => {
+  //let history = localStorage.getItem('conversationHistory');
+  //let folders = localStorage.getItem('folders');
+  //let prompts = localStorage.getItem('prompts');
 
   if (history) {
     history = JSON.parse(history);

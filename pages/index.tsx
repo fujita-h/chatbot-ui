@@ -20,13 +20,9 @@ import {
 } from '@/utils/app/clean';
 import { DEFAULT_SYSTEM_PROMPT } from '@/utils/app/const';
 import {
-  saveConversation,
-  saveConversations,
   updateConversation,
 } from '@/utils/app/conversation';
-import { saveFolders } from '@/utils/app/folders';
-import { exportData, importData } from '@/utils/app/importExport';
-import { savePrompts } from '@/utils/app/prompts';
+import { cleanData, exportData } from '@/utils/app/importExport';
 import { IconArrowBarLeft, IconArrowBarRight } from '@tabler/icons-react';
 import { GetServerSideProps } from 'next';
 import { useTranslation } from 'next-i18next';
@@ -218,7 +214,7 @@ const Home: React.FC<HomeProps> = ({
         }
       }
 
-      saveConversation(updatedConversation);
+      setServerStorage('selectedConversation', JSON.stringify(updatedConversation));
 
       const updatedConversations: Conversation[] = conversations.map(
         (conversation) => {
@@ -236,7 +232,7 @@ const Home: React.FC<HomeProps> = ({
 
       setConversations(updatedConversations);
 
-      saveConversations(updatedConversations);
+      setServerStorage('conversationHistory', JSON.stringify(updatedConversations));
 
       setMessageIsStreaming(false);
     }
@@ -290,11 +286,69 @@ const Home: React.FC<HomeProps> = ({
     setModelError(null);
   };
 
+
+  // SERVER STORAGE ----------------------------------------------
+
+  const getServerStorage = async (key: string) => {
+    const response = await fetch('/api/storage', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getAccessToken() || ''}`,
+      },
+      body: JSON.stringify({
+        key,
+      }),
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return data.value;
+    } else {
+      return null;
+    }
+  }
+
+  const setServerStorage = async (key: string, value: string) => {
+    const response = await fetch('/api/storage', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getAccessToken() || ''}`,
+      },
+      body: JSON.stringify({
+        key,
+        value,
+      }),
+    });
+    if (response.ok) {
+      return true;
+    }
+    return false;
+  }
+
+  const deleteServerStorage = async (key: string) => {
+    const response = await fetch('/api/storage', {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getAccessToken() || ''}`,
+      },
+      body: JSON.stringify({
+        key,
+      }),
+    });
+    if (response.ok) {
+      return true;
+    }
+    return false;
+  }
+
+
   // BASIC HANDLERS --------------------------------------------
 
   const handleLightMode = (mode: 'dark' | 'light') => {
     setLightMode(mode);
-    localStorage.setItem('theme', mode);
+    setServerStorage('theme', mode);
   };
 
   const handleApiKeyChange = (apiKey: string) => {
@@ -304,20 +358,30 @@ const Home: React.FC<HomeProps> = ({
 
   const handleToggleChatbar = () => {
     setShowSidebar(!showSidebar);
-    localStorage.setItem('showChatbar', JSON.stringify(!showSidebar));
+    setServerStorage('showChatbar', JSON.stringify(!showSidebar));
   };
 
   const handleTogglePromptbar = () => {
     setShowPromptbar(!showPromptbar);
-    localStorage.setItem('showPromptbar', JSON.stringify(!showPromptbar));
+    setServerStorage('showPromptbar', JSON.stringify(!showPromptbar));
   };
 
-  const handleExportData = () => {
-    exportData();
+  const handleExportData = async () => {
+    let history = await getServerStorage('conversationHistory')
+    let folders = await getServerStorage('folders')
+    let prompts = await getServerStorage('prompts')
+    exportData(history, folders, prompts);
   };
 
   const handleImportConversations = (data: SupportedExportFormats) => {
-    const { history, folders, prompts }: LatestExportFormat = importData(data);
+    const cleanedData = cleanData(data);
+    const conversations = cleanedData.history;
+    setServerStorage('conversationHistory', JSON.stringify(conversations));
+    setServerStorage('selectedConversation', JSON.stringify(conversations[conversations.length - 1]));
+    setServerStorage('folders', JSON.stringify(cleanedData.folders));
+    setServerStorage('prompts', JSON.stringify(cleanedData.prompts));
+
+    const { history, folders, prompts }: LatestExportFormat = cleanedData;
 
     setConversations(history);
     setSelectedConversation(history[history.length - 1]);
@@ -327,7 +391,7 @@ const Home: React.FC<HomeProps> = ({
 
   const handleSelectConversation = (conversation: Conversation) => {
     setSelectedConversation(conversation);
-    saveConversation(conversation);
+    setServerStorage('selectedConversation', JSON.stringify(conversation));
   };
 
   // FOLDER OPERATIONS  --------------------------------------------
@@ -342,13 +406,13 @@ const Home: React.FC<HomeProps> = ({
     const updatedFolders = [...folders, newFolder];
 
     setFolders(updatedFolders);
-    saveFolders(updatedFolders);
+    setServerStorage('folders', JSON.stringify(updatedFolders));
   };
 
   const handleDeleteFolder = (folderId: string) => {
     const updatedFolders = folders.filter((f) => f.id !== folderId);
     setFolders(updatedFolders);
-    saveFolders(updatedFolders);
+    setServerStorage('folders', JSON.stringify(updatedFolders));
 
     const updatedConversations: Conversation[] = conversations.map((c) => {
       if (c.folderId === folderId) {
@@ -361,7 +425,7 @@ const Home: React.FC<HomeProps> = ({
       return c;
     });
     setConversations(updatedConversations);
-    saveConversations(updatedConversations);
+    setServerStorage('conversationHistory', JSON.stringify(updatedConversations));
 
     const updatedPrompts: Prompt[] = prompts.map((p) => {
       if (p.folderId === folderId) {
@@ -374,7 +438,7 @@ const Home: React.FC<HomeProps> = ({
       return p;
     });
     setPrompts(updatedPrompts);
-    savePrompts(updatedPrompts);
+    setServerStorage('prompts', JSON.stringify(updatedPrompts));
   };
 
   const handleUpdateFolder = (folderId: string, name: string) => {
@@ -390,7 +454,7 @@ const Home: React.FC<HomeProps> = ({
     });
 
     setFolders(updatedFolders);
-    saveFolders(updatedFolders);
+    setServerStorage('folders', JSON.stringify(updatedFolders));
   };
 
   // CONVERSATION OPERATIONS  --------------------------------------------
@@ -417,8 +481,8 @@ const Home: React.FC<HomeProps> = ({
     setSelectedConversation(newConversation);
     setConversations(updatedConversations);
 
-    saveConversation(newConversation);
-    saveConversations(updatedConversations);
+    setServerStorage('selectedConversation', JSON.stringify(newConversation));
+    setServerStorage('conversationHistory', JSON.stringify(updatedConversations));
 
     setLoading(false);
   };
@@ -428,13 +492,13 @@ const Home: React.FC<HomeProps> = ({
       (c) => c.id !== conversation.id,
     );
     setConversations(updatedConversations);
-    saveConversations(updatedConversations);
+    setServerStorage('conversationHistory', JSON.stringify(updatedConversations));
 
     if (updatedConversations.length > 0) {
       setSelectedConversation(
         updatedConversations[updatedConversations.length - 1],
       );
-      saveConversation(updatedConversations[updatedConversations.length - 1]);
+      setServerStorage('selectedConversation', JSON.stringify(updatedConversations[updatedConversations.length - 1]));
     } else {
       setSelectedConversation({
         id: uuidv4(),
@@ -444,7 +508,7 @@ const Home: React.FC<HomeProps> = ({
         prompt: DEFAULT_SYSTEM_PROMPT,
         folderId: null,
       });
-      localStorage.removeItem('selectedConversation');
+      deleteServerStorage('selectedConversation');
     }
   };
 
@@ -462,13 +526,16 @@ const Home: React.FC<HomeProps> = ({
       conversations,
     );
 
+    setServerStorage('selectedConversation', JSON.stringify(single));
+    setServerStorage('conversationHistory', JSON.stringify(all));
+
     setSelectedConversation(single);
     setConversations(all);
   };
 
   const handleClearConversations = () => {
     setConversations([]);
-    localStorage.removeItem('conversationHistory');
+    deleteServerStorage('conversationHistory');
 
     setSelectedConversation({
       id: uuidv4(),
@@ -478,11 +545,11 @@ const Home: React.FC<HomeProps> = ({
       prompt: DEFAULT_SYSTEM_PROMPT,
       folderId: null,
     });
-    localStorage.removeItem('selectedConversation');
+    deleteServerStorage('selectedConversation');
 
     const updatedFolders = folders.filter((f) => f.type !== 'chat');
     setFolders(updatedFolders);
-    saveFolders(updatedFolders);
+    setServerStorage('folders', JSON.stringify(updatedFolders));
   };
 
   const handleEditMessage = (message: Message, messageIndex: number) => {
@@ -529,7 +596,7 @@ const Home: React.FC<HomeProps> = ({
     const updatedPrompts = [...prompts, newPrompt];
 
     setPrompts(updatedPrompts);
-    savePrompts(updatedPrompts);
+    setServerStorage('prompts', JSON.stringify(updatedPrompts));
   };
 
   const handleUpdatePrompt = (prompt: Prompt) => {
@@ -542,17 +609,17 @@ const Home: React.FC<HomeProps> = ({
     });
 
     setPrompts(updatedPrompts);
-    savePrompts(updatedPrompts);
+    setServerStorage('prompts', JSON.stringify(updatedPrompts));
   };
 
   const handleDeletePrompt = (prompt: Prompt) => {
     const updatedPrompts = prompts.filter((p) => p.id !== prompt.id);
     setPrompts(updatedPrompts);
-    savePrompts(updatedPrompts);
+    setServerStorage('prompts', JSON.stringify(updatedPrompts));
   };
 
   // LOGOUT --------------------------------------------
-  
+
   const handleLogout = () => {
     instance.logoutRedirect({
       account: accounts[0]
@@ -583,10 +650,11 @@ const Home: React.FC<HomeProps> = ({
   // ON LOAD --------------------------------------------
 
   useEffect(() => {
-    const theme = localStorage.getItem('theme');
-    if (theme) {
-      setLightMode(theme as 'dark' | 'light');
-    }
+    getServerStorage('theme').then((theme) => {
+      if (theme) {
+        setLightMode(theme as 'dark' | 'light');
+      }
+    })
 
     const apiKey = localStorage.getItem('apiKey');
     if (apiKey) {
@@ -600,54 +668,60 @@ const Home: React.FC<HomeProps> = ({
       setShowSidebar(false);
     }
 
-    const showChatbar = localStorage.getItem('showChatbar');
-    if (showChatbar) {
-      setShowSidebar(showChatbar === 'true');
-    }
+    getServerStorage('showChatbar').then((showChatbar) => {
+      if (showChatbar) {
+        setShowSidebar(showChatbar === 'true');
+      }
+    })
 
-    const showPromptbar = localStorage.getItem('showPromptbar');
-    if (showPromptbar) {
-      setShowPromptbar(showPromptbar === 'true');
-    }
+    getServerStorage('showPromptbar').then((showPromptbar) => {
+      if (showPromptbar) {
+        setShowPromptbar(showPromptbar === 'true');
+      }
+    })
 
-    const folders = localStorage.getItem('folders');
-    if (folders) {
-      setFolders(JSON.parse(folders));
-    }
+    getServerStorage('folders').then((folders) => {
+      if (folders) {
+        setFolders(JSON.parse(folders));
+      }
+    })
 
-    const prompts = localStorage.getItem('prompts');
-    if (prompts) {
-      setPrompts(JSON.parse(prompts));
-    }
+    getServerStorage('prompts').then((prompts) => {
+      if (prompts) {
+        setPrompts(JSON.parse(prompts));
+      }
+    })
 
-    const conversationHistory = localStorage.getItem('conversationHistory');
-    if (conversationHistory) {
-      const parsedConversationHistory: Conversation[] =
-        JSON.parse(conversationHistory);
-      const cleanedConversationHistory = cleanConversationHistory(
-        parsedConversationHistory,
-      );
-      setConversations(cleanedConversationHistory);
-    }
+    getServerStorage('conversationHistory').then((conversationHistory) => {
+      if (conversationHistory) {
+        const parsedConversationHistory: Conversation[] =
+          JSON.parse(conversationHistory);
+        const cleanedConversationHistory = cleanConversationHistory(
+          parsedConversationHistory,
+        );
+        setConversations(cleanedConversationHistory);
+      }
+    })
 
-    const selectedConversation = localStorage.getItem('selectedConversation');
-    if (selectedConversation) {
-      const parsedSelectedConversation: Conversation =
-        JSON.parse(selectedConversation);
-      const cleanedSelectedConversation = cleanSelectedConversation(
-        parsedSelectedConversation,
-      );
-      setSelectedConversation(cleanedSelectedConversation);
-    } else {
-      setSelectedConversation({
-        id: uuidv4(),
-        name: 'New conversation',
-        messages: [],
-        model: OpenAIModels[defaultModelId],
-        prompt: DEFAULT_SYSTEM_PROMPT,
-        folderId: null,
-      });
-    }
+    getServerStorage('selectedConversation').then((selectedConversation) => {
+      if (selectedConversation) {
+        const parsedSelectedConversation: Conversation =
+          JSON.parse(selectedConversation);
+        const cleanedSelectedConversation = cleanSelectedConversation(
+          parsedSelectedConversation,
+        );
+        setSelectedConversation(cleanedSelectedConversation);
+      } else {
+        setSelectedConversation({
+          id: uuidv4(),
+          name: 'New conversation',
+          messages: [],
+          model: OpenAIModels[defaultModelId],
+          prompt: DEFAULT_SYSTEM_PROMPT,
+          folderId: null,
+        });
+      }
+    })
   }, [serverSideApiKeyIsSet]);
 
   if (inProgress !== InteractionStatus.None) { return (<></>) }
