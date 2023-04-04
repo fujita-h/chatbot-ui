@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-
+const port = process.env.PORT || 3000
 const authEndpointPaths = ['/api/_auth/']
 const requireTokenPaths = ['/api/']
 
@@ -21,7 +21,7 @@ export async function middleware(request: NextRequest) {
     }
     
     // check token
-    const verifyResponse = await fetch('http://localhost:3000/api/_auth/verifyToken', { headers: { Authorization: `Bearer ${token}` } })
+    const verifyResponse = await fetch(`http://localhost:${port}/api/_auth/verifyToken`, { headers: { Authorization: `Bearer ${token}` } })
     if(!verifyResponse.ok) {
       return new NextResponse(JSON.stringify({ error: 401, status: "Unauthorized" }), { status: 401 })
     }
