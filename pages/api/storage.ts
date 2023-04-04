@@ -7,7 +7,7 @@ import jwt from 'jsonwebtoken'
 const endpoint = process.env.COSMOS_ENDPOINT || "";
 // Provide required connection from environment variables
 const key = process.env.COSMOS_KEY;
-const database = process.env.COSMOS_DATABASE || "user-storage";
+const database = process.env.COSMOS_DATABASE || "chatbot-db";
 
 const simpleKeyValueContainers = [
   "theme", 
@@ -31,13 +31,13 @@ cosmosClient.databases.createIfNotExists({ id: database })
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = req.headers.authorization?.split(' ')[1] || ''
-  const decoded: any = jwt.decode(token)
+  const decoded: any = jwt.decode(token) || {}
+  const { upn } = decoded
 
   if (req.method === 'POST') {
-    const { upn } = decoded
     const { key } = req.body
 
-    if (simpleKeyValueContainers.includes(key)) {
+    if (upn && simpleKeyValueContainers.includes(key)) {
       try {
         const container = cosmosClient.database(database).container(key);
         const { statusCode, resource } = await container.item(upn, upn).read();
@@ -57,10 +57,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
   } else if (req.method === 'PUT') {
-    const { upn } = decoded
     const { key, value } = req.body
 
-    if (simpleKeyValueContainers.includes(key)) {
+    if (upn && simpleKeyValueContainers.includes(key)) {
       const container = cosmosClient.database(database).container(key);
       const { statusCode } = await container.items.upsert({ id: upn, value })
       res.status(statusCode).send({ statusCode })
@@ -69,10 +68,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
   } else if (req.method === 'DELETE') {
-    const { upn } = decoded
     const { key } = req.body
 
-    if (simpleKeyValueContainers.includes(key)) {
+    if (upn && simpleKeyValueContainers.includes(key)) {
       try {
         const container = cosmosClient.database(database).container(key);
         const { statusCode } = await container.item(upn, upn).delete()

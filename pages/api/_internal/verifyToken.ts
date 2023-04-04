@@ -3,6 +3,8 @@ import jwt, { JwtHeader, SigningKeyCallback } from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
 import { jwksUrl, AAD_TENANT_ID, AAD_APP_ID, AAD_API_APP_SCOPE } from "@/auth.config";
 
+const internalSecret = process.env.INTERNAL_SECRET || 'secret'
+
 const client = jwksClient({
   jwksUri: `${jwksUrl}`,
   cache: true,
@@ -71,6 +73,10 @@ async function verifyToken(token: string) {
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const token = req.headers.authorization?.split(' ')[1] || ""
+
+  if(req.headers.internal !== internalSecret) {
+    return res.status(401).json({ result: false, reason: "No internal secret" });
+  }
 
   if (!token) {
     return res.status(401).json({ result: false, reason: "No token" });
