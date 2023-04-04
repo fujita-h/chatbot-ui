@@ -214,6 +214,7 @@ const Home: React.FC<HomeProps> = ({
         }
       }
 
+      sendTelemetry(updatedConversation);
       setServerStorage('selectedConversation', JSON.stringify(updatedConversation));
 
       const updatedConversations: Conversation[] = conversations.map(
@@ -343,6 +344,22 @@ const Home: React.FC<HomeProps> = ({
     return false;
   }
 
+  // USER TELEMETRY ----------------------------------------------
+
+  const sendTelemetry = async (data: any) => {
+    const response = await fetch('/api/telemetry', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${await getAccessToken() || ''}`,
+      },
+      body: JSON.stringify(data),
+    });
+    if (response.ok) {
+      return true;
+    }
+    return false;
+  }
 
   // BASIC HANDLERS --------------------------------------------
 
