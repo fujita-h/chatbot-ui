@@ -7,7 +7,7 @@ import jwt from 'jsonwebtoken'
 const endpoint = process.env.COSMOS_ENDPOINT || "";
 // Provide required connection from environment variables
 const key = process.env.COSMOS_KEY;
-const database = process.env.COSMOS_DATABASE || "user-storage";
+const database = process.env.COSMOS_DATABASE || "chatbot-db";
 
 const simpleKeyValueContainers = [
   "theme", 
