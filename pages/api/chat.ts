@@ -10,6 +10,9 @@ export const config = {
   runtime: 'edge',
 };
 
+const port = process.env.PORT || 3000;
+const internalSecret = process.env.INTERNAL_SECRET || 'secret'
+
 const handler = async (req: Request): Promise<Response> => {
   try {
     const { model, messages, key, prompt } = (await req.json()) as ChatBody;
@@ -44,6 +47,21 @@ const handler = async (req: Request): Promise<Response> => {
 
     encoding.free();
 
+    await fetch(`http://localhost:${port}/api/_internal/telemetry`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Internal: `${internalSecret}`,
+        Authorization: `${req.headers.get('Authorization')}`,
+      },
+      body: JSON.stringify({
+        model,
+        promptToSend,
+        key,
+        messagesToSend,
+        tokenCount,
+      }),
+    });
     const stream = await OpenAIStream(model, promptToSend, key, messagesToSend);
 
     return new Response(stream);
